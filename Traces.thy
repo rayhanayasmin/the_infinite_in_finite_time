@@ -1,10 +1,11 @@
 theory Traces 
-imports Main HOL.Lattices HOL.List
+imports Main HOL.Lattices HOL.List 
 begin
+
+chapter \<open>Traces and Definitive Prefixes\<close>
 
 section \<open>Traces\<close>
 
-typedecl \<Sigma>
 type_synonym 'a finite_trace = \<open>'a list\<close>
 type_synonym 'a infinite_trace = \<open>nat \<Rightarrow> 'a\<close>
 datatype 'a trace = Finite \<open>'a finite_trace\<close> | Infinite \<open>'a infinite_trace\<close>
@@ -13,7 +14,7 @@ fun thead :: \<open>'a trace \<Rightarrow> 'a\<close> where
   \<open>thead (Finite t) = t ! 0\<close>
 | \<open>thead (Infinite t) = t 0\<close>
 
-fun append :: "'a trace \<Rightarrow> 'a trace \<Rightarrow> 'a trace" (infixr "\<frown>" 80) where
+fun append :: \<open>'a trace \<Rightarrow> 'a trace \<Rightarrow> 'a trace\<close> (infixr \<open>\<frown>\<close> 80) where
   \<open>(Finite t)   \<frown> (Infinite \<omega>) = Infinite (\<lambda>n. if n < length t then t!n else \<omega> (n - length t))\<close>
 | \<open>(Finite t)   \<frown> (Finite u)   = Finite (t @ u)\<close>
 | \<open>(Infinite t) \<frown> u            = Infinite t\<close>
@@ -24,47 +25,59 @@ definition \<epsilon> :: \<open>'a trace\<close> where
 definition singleton :: \<open>'a \<Rightarrow> 'a trace\<close> where
   \<open>singleton \<sigma> = Finite [\<sigma>]\<close>
 
-interpretation trace: monoid_list \<open>(\<frown>)\<close> \<epsilon>
+interpretation trace: monoid_list \<open>(\<frown>)\<close> \<open>\<epsilon>\<close>
 proof unfold_locales
   fix a :: \<open>'a trace\<close> show \<open>\<epsilon> \<frown> a = a\<close>
-    by (cases a; simp add: \<epsilon>_def)
+    by (cases \<open>a\<close>; simp add: \<epsilon>_def)
 next
   fix a :: \<open>'a trace\<close> show \<open>a \<frown> \<epsilon> = a\<close> 
-    by (cases a; simp add: \<epsilon>_def)
+    by (cases \<open>a\<close>; simp add: \<epsilon>_def)
 next
   fix a b c :: \<open>'a trace\<close> show \<open>(a \<frown> b) \<frown> c = a \<frown> (b \<frown> c)\<close>
-    apply (cases a; simp; cases b; simp; cases c; simp)
+    apply (cases \<open>a\<close>; simp)
+    apply (cases \<open>b\<close>; simp)
+    apply (cases \<open>c\<close>; simp)
     apply (rule ext; simp)
     by (smt (verit, ccfv_threshold) 
             add.commute add_diff_inverse_nat add_less_cancel_left 
             nth_append trans_less_add2)
 qed
 
+lemma Infinite_helper[simp]: \<open>Infinite x \<in> Infinite ` P \<longleftrightarrow> x \<in> P\<close>
+  by blast
+lemma Infinite_inter_helper[simp]: \<open>Infinite ` (a \<inter> b) = (Infinite ` a) \<inter> (Infinite ` b)\<close>
+  by blast
+lemma Infinite_Inter_helper[simp]: \<open>K \<noteq> {} \<Longrightarrow> Infinite ` (\<Inter> K) = (\<Inter> k \<in> K. Infinite ` k)\<close>
+  by blast
+
 lemma finite_empty_suffix: 
   assumes \<open>Finite xs = Finite xs \<frown> t\<close>
   shows \<open>t = \<epsilon>\<close>
-  using assms by (cases t) (simp_all add: \<epsilon>_def)
+  using assms by (cases \<open>t\<close>) (simp_all add: \<epsilon>_def)
 
 lemma finite_empty_prefix: 
   assumes \<open>Finite xs = t \<frown> Finite xs\<close>
   shows \<open>t = \<epsilon>\<close>
-  using assms by (cases t) (simp_all add: \<epsilon>_def)
+  using assms by (cases \<open>t\<close>) (simp_all add: \<epsilon>_def)
 
 lemma finite_finite_suffix: 
   assumes \<open>Finite xs = Finite ys \<frown> t\<close>
   obtains zs where \<open>t = Finite zs\<close>
-  using assms by (cases t) (simp_all)
+  using assms by (cases \<open>t\<close>) (simp_all)
 
 lemma finite_finite_prefix:
   assumes \<open>Finite xs = t \<frown> Finite ys\<close>
   obtains zs where \<open>t = Finite zs\<close>
-  using assms by (cases t) (simp_all)
+  using assms by (cases \<open>t\<close>) (simp_all)
+
+lemma infinite_append_right: \<open>\<exists>k. x' \<frown> Infinite f = Infinite k\<close>
+  by (cases x'; simp)
 
 lemma append_is_empty:
   assumes \<open>t \<frown> u = \<epsilon>\<close>
   shows   \<open>t = \<epsilon>\<close>
   and     \<open>u = \<epsilon>\<close>
-  using assms by (simp add: \<epsilon>_def; cases t; cases u; simp)+
+  using assms by (simp add: \<epsilon>_def; cases \<open>t\<close>; cases \<open>u\<close>; simp)+
 
 fun ttake :: \<open>nat \<Rightarrow> 'a trace \<Rightarrow> 'a finite_trace\<close> where
   \<open>ttake k (Finite xs) = take k xs\<close>
@@ -86,13 +99,15 @@ fun tdrop :: \<open>nat \<Rightarrow> 'a trace \<Rightarrow> 'a trace\<close> wh
 | \<open>tdrop k (Infinite xs) = Infinite (itdrop k xs) \<close>
 
 lemma ttake_simp[simp]: \<open>ttake (length xs) (Finite xs \<frown> t) = xs\<close>
-  by (cases t, auto intro:  list_eq_iff_nth_eq[THEN iffD2])
+  by (cases \<open>t\<close>, auto intro:  list_eq_iff_nth_eq[THEN iffD2])
 
 lemma ttake_tdrop[simp]: \<open>Finite (ttake k t) \<frown> tdrop k t = t\<close>
-  by (cases t, auto simp: itdrop_def)
+  by (cases \<open>t\<close>, auto simp: itdrop_def)
+
 
 definition prefixes :: \<open>'a trace \<Rightarrow> 'a trace set\<close> (\<open>\<down> _\<close> [80] 80) where
   \<open>\<down> t = { u | u v. t = u \<frown> v }\<close>
+
 
 definition extensions :: \<open>'a trace \<Rightarrow> 'a trace set\<close> (\<open>\<up> _\<close> [80] 80) where
   \<open>\<up> t = { t \<frown> u | u. True }\<close>
@@ -110,7 +125,7 @@ proof
 next
   (* Strict Ordering *)
   fix x y :: \<open>'a trace\<close>
-  show "(x \<in> \<down> y \<and> x \<noteq> y) = (x \<in> \<down> y \<and> \<not> y \<in> \<down> x)"
+  show \<open>(x \<in> \<down> y \<and> x \<noteq> y) = (x \<in> \<down> y \<and> \<not> y \<in> \<down> x)\<close>
     unfolding prefixes_def
     by (simp, metis append.simps(3) append_is_empty(1) finite_empty_suffix 
                     trace.assoc trace.exhaust)
@@ -119,15 +134,15 @@ next
   fix x y :: \<open>'a trace\<close>
   assume assms: \<open>x \<in> \<down> y\<close> \<open>y \<in> \<down> x\<close>
   show \<open>x = y\<close> 
-  proof (cases y)
+  proof (cases \<open>y\<close>)
     case Finite note yfinite = this 
-    show ?thesis
-    proof (cases x)
+    show \<open>?thesis\<close>
+    proof (cases \<open>x\<close>)
       case Finite
       with assms(2) obtain z where \<open>x = y \<frown> z\<close> 
         unfolding  prefixes_def
         by auto
-      with assms(1) yfinite show ?thesis
+      with assms(1) yfinite show \<open>?thesis\<close>
         unfolding  prefixes_def
         by (force simp: trace.assoc dest: finite_empty_suffix append_is_empty)
     qed (smt (verit, del_insts) CollectD append.simps(3) assms(1) prefixes_def)
@@ -146,7 +161,12 @@ lemma prefixes_empty_least : \<open>\<epsilon> \<in> \<down> t\<close>
 lemma prefixes_infinite_greatest : \<open>Infinite x \<in> \<down> t \<Longrightarrow> t = Infinite x\<close>
   by (simp add: prefixes_def)
 
+lemma prefixes_append: \<open>x \<in> \<down> (x \<frown> y)\<close>
+  unfolding prefixes_def by blast
 
+lemmas prefixes_append_finite_infinite[simp]
+   = prefixes_append [ where x = \<open>Finite x\<close> and y = \<open>Infinite (\<lambda>_.undefined)\<close> for x
+                     , simplified ]
 
 lemma prefixes_finite : \<open>Finite xs \<in> \<down> Finite ys \<longleftrightarrow> (\<exists> zs. ys = xs @ zs)\<close>
 proof (rule)
@@ -157,32 +177,32 @@ next
     by (clarsimp simp: prefixes_def) (metis Traces.append.simps(2))
 qed
 
+
 lemma ttake_take : \<open>take n (ttake m t) = ttake (min n m) t\<close>
-  by (cases t) (simp_all add: min_def take_map)
+  by (cases \<open>t\<close>) (simp_all add: min_def take_map)
 
 lemma tdrop_tdrop : \<open>tdrop n (tdrop m t) = tdrop (n + m) t\<close>
-  by (cases t) (simp_all add: add.commute add.left_commute)
+  by (cases \<open>t\<close>) (simp_all add: add.commute add.left_commute)
 
 
 lemma tdrop_mono: \<open>t \<in> \<down> u \<Longrightarrow> tdrop k t \<in> \<down> tdrop k u\<close>
-  unfolding prefixes_def
-proof (clarsimp)
-  fix v assume A: \<open>u = t \<frown> v\<close> thus \<open>\<exists>va. tdrop k (t \<frown> v) = tdrop k t \<frown> va \<close>
-  proof (cases t; cases v)
-    fix x1 x2 assume \<open>t = Finite x1\<close> and \<open>v = Finite x2\<close> with A show ?thesis
+proof -
+  { fix v assume A: \<open>u = t \<frown> v\<close> then have \<open>\<exists>va. tdrop k (t \<frown> v) = tdrop k t \<frown> va \<close>
+  proof (cases \<open>t\<close>; cases \<open>v\<close>)
+    fix x1 x2 assume \<open>t = Finite x1\<close> and \<open>v = Finite x2\<close> with A show \<open>?thesis\<close>
       by (simp, metis Traces.append.simps(2))
   next
-    fix x1 x2 assume \<open>t = Finite x1\<close> and \<open>v = Infinite x2\<close> with A show ?thesis
-      apply simp
-      apply (rule_tac x = "Infinite (itdrop (k - length x1) x2)" in exI)
-      apply clarsimp
-      apply (rule ext)
-      apply clarsimp
-      apply (rule)      
-       apply (simp add: add.commute itdrop_def less_diff_conv)
-      by (smt (z3) add.commute add_diff_cancel_left' add_diff_inverse_nat diff_is_0_eq' 
-                   diff_right_commute itdrop_def linorder_not_less nat_less_le)
-  qed auto
+    fix x1 x2 assume \<open>t = Finite x1\<close> and \<open>v = Infinite x2\<close> with A
+     have \<open>tdrop k (t \<frown> v) = tdrop k t \<frown> Infinite (itdrop (k - length x1) x2) \<close>
+      apply (clarsimp simp: add.commute itdrop_def less_diff_conv)
+       apply (rule ext)
+       apply clarsimp
+       by (metis (no_types, lifting) Nat.add_diff_assoc Nat.diff_diff_right add.commute 
+                 add_diff_cancel_right' diff_is_0_eq' nle_le)
+    then show \<open>\<exists>va. tdrop k (t \<frown> v) = tdrop k t \<frown> va\<close>
+      by auto
+  qed auto } note A = this
+  assume \<open>t \<in> \<down> u\<close> with A show ?thesis unfolding prefixes_def by clarsimp
 qed
 
 lemma ttake_finite_prefixes : \<open>Finite xs \<in> \<down> t \<longleftrightarrow> xs = ttake (length xs) t\<close>
@@ -196,24 +216,20 @@ next
 qed
 
 lemma ttake_prefixes : \<open>a \<le> b \<Longrightarrow> Finite (ttake a t) \<in> \<down> Finite (ttake b t)\<close>
-  by (cases t; simp add: ttake_finite_prefixes min_def take_map)
-
-
-
-
+  by (cases \<open>t\<close>; simp add: ttake_finite_prefixes min_def take_map)
 
 lemma finite_directed:
 assumes \<open> Finite xs \<in> \<down> t \<close> \<open> Finite ys \<in> \<down> t \<close>
 shows \<open> \<exists>zs. (xs = ys @ zs) \<or> (ys = xs @ zs) \<close>
 proof (cases \<open>length xs > length ys\<close>)
   case True
-  with assms show ?thesis 
+  with assms show \<open>?thesis\<close> 
     apply (simp add: ttake_finite_prefixes)
     using ttake_prefixes[simplified prefixes_finite]
     by (metis less_le_not_le) 
 next
   case False
-  from assms this[THEN leI] show ?thesis 
+  from assms this[THEN leI] show \<open>?thesis\<close> 
     apply (simp add: ttake_finite_prefixes)
     using ttake_prefixes[simplified prefixes_finite]
     by (metis)
@@ -221,10 +237,12 @@ qed
 
 
 lemma prefixes_directed: \<open>u \<in> \<down> t \<Longrightarrow> v \<in> \<down> t \<Longrightarrow> u \<in> \<down> v \<or> v \<in> \<down> u\<close>
-proof (cases v; cases u; simp)
-  fix a b assume \<open>Finite a \<in> \<down> t\<close> \<open>Finite b \<in> \<down> t\<close> 
-  then show \<open>Finite a \<in> \<down> Finite b \<or> Finite b \<in> \<down> Finite a\<close>
-    using finite_directed prefixes_finite by blast
+proof (cases \<open>v\<close>; cases \<open>u\<close>)
+  { fix a b assume \<open>Finite a \<in> \<down> t\<close> \<open>Finite b \<in> \<down> t\<close> 
+  then have \<open>Finite a \<in> \<down> Finite b \<or> Finite b \<in> \<down> Finite a\<close>
+    using finite_directed prefixes_finite by blast } note X = this
+  fix a b show \<open>u \<in> \<down> t \<Longrightarrow> v \<in> \<down> t \<Longrightarrow> v = Finite a \<Longrightarrow> u = Finite b \<Longrightarrow> u \<in> \<down> v \<or> v \<in> \<down> u\<close> 
+    using X by auto
 qed (auto simp: prefixes_def dest: prefixes_infinite_greatest)
 
 interpretation extensions: order \<open>\<lambda> t u. t \<in> \<up> u\<close> \<open>\<lambda> t u. t \<in> \<up> u \<and> t \<noteq> u\<close>
@@ -237,11 +255,11 @@ lemma extensions_infinite[simp]: \<open>\<up> Infinite xs = { Infinite xs }\<clo
 lemma extensions_empty[simp]: \<open>\<up> \<epsilon> = UNIV\<close>
   by (simp add: extensions_def)
 
+lemma prefixes_infinite: \<open>\<exists>xi. x \<in> \<down> Infinite xi\<close>
+  by (metis infinite_append_right prefixes_append)
+
 lemma prefixes_empty: \<open>\<down> \<epsilon> = {\<epsilon>}\<close>
-  apply (clarsimp simp add: set_eq_iff \<epsilon>_def prefixes_def)
-  apply (rule)
-  apply (metis \<epsilon>_def append_is_empty(1))
-  by (metis \<epsilon>_def trace.left_neutral)
+  using prefixes.leD prefixes_empty_least by auto
 
 
 section \<open>Prefix Closure\<close>
@@ -251,6 +269,7 @@ definition prefix_closure :: \<open>'a trace set \<Rightarrow> 'a trace set\<clo
 
 lemma prefix_closure_subset: \<open>X \<subseteq> \<down>\<^sub>s X\<close>
   unfolding prefix_closure_def
+apply clarsimp
   by auto 
 
 lemma prefix_closure_infinite: \<open>Infinite x \<in> \<down>\<^sub>s X \<longleftrightarrow> Infinite x \<in> X\<close>
@@ -299,6 +318,51 @@ lemma prefix_closure_prefixes: \<open>\<down>\<^sub>s (\<down> t) = \<down> t\<c
   unfolding prefix_closure_def
   by (force intro: prefixes.dual_order.trans)
 
+section \<open>Extensions Closure\<close> 
+definition extensions_closure :: \<open>'a trace set \<Rightarrow> 'a trace set\<close> (\<open>\<up>\<^sub>s _\<close> [80] 80) where
+  \<open>\<up>\<^sub>s X = (\<Union> t \<in> X. extensions t) \<close>
+
+lemma extensions_closure_subset: \<open>X \<subseteq> \<up>\<^sub>s X\<close>
+  unfolding extensions_closure_def
+  by auto 
+
+lemma extensions_closure_idem: \<open>\<up>\<^sub>s \<up>\<^sub>s X = \<up>\<^sub>s X\<close>
+  unfolding extensions_closure_def
+  using extensions.order.trans by blast
+
+lemma extensions_closure_mono: \<open>X \<subseteq> Y \<Longrightarrow> \<up>\<^sub>s X \<subseteq> \<up>\<^sub>s Y\<close>
+  unfolding extensions_closure_def
+  by blast
+
+lemma extensions_closure_union_distrib: \<open>\<up>\<^sub>s (X \<union> Y) = \<up>\<^sub>s X \<union> \<up>\<^sub>s Y\<close>
+  unfolding extensions_closure_def
+  by simp
+
+lemma extensions_closure_Union_distrib: \<open>\<up>\<^sub>s (\<Union> S) = \<Union> (extensions_closure ` S)\<close>
+  unfolding extensions_closure_def
+  by simp
+
+lemma extensions_closure_Inter: \<open>\<up>\<^sub>s (\<Inter> (extensions_closure ` S)) = \<Inter> (extensions_closure ` S) \<close>
+  unfolding extensions_closure_def
+  using extensions.dual_order.trans by fastforce
+
+lemma extensions_closure_inter: \<open>\<up>\<^sub>s (\<up>\<^sub>s X \<inter> \<up>\<^sub>s Y) = \<up>\<^sub>s X \<inter> \<up>\<^sub>s Y\<close>
+  by (rule extensions_closure_Inter[where S = \<open>{X,Y}\<close>, simplified])
+
+lemma extensions_closure_UNIV: \<open>\<up>\<^sub>s UNIV = UNIV\<close>
+  unfolding extensions_closure_def by blast
+
+lemma extensions_closure_empty: \<open>\<up>\<^sub>s {} = {}\<close>
+  unfolding extensions_closure_def by blast
+
+lemma extensions_closure_prefixes: \<open> \<up>\<^sub>s (\<down> t) = UNIV\<close>
+  unfolding extensions_closure_def
+  by (metis Sup_upper extensions_empty image_eqI prefixes_empty_least top.extremum_uniqueI)
+
+lemma extensions_closure_extensions: \<open>\<up>\<^sub>s (\<up> t) = \<up> t\<close>
+  unfolding extensions_closure_def
+  by (force intro: extensions.dual_order.trans)
+
 section \<open>Definitive Prefixes\<close>
 
 definition dprefixes :: \<open>'a trace set \<Rightarrow> 'a trace set\<close>  (\<open>\<down>\<^sub>d _\<close> [80] 80) where
@@ -327,6 +391,10 @@ lemma dprefixes_contains_extensions: \<open>t \<in> \<down>\<^sub>d X \<Longrigh
   unfolding dprefixes_def
   using extensions.dual_order.trans by auto
 
+lemma extensions_closure_dprefixes:  \<open>\<up>\<^sub>s \<down>\<^sub>d X =  \<down>\<^sub>d X\<close>
+  unfolding extensions_closure_def
+  using dprefixes_contains_extensions by fastforce
+
 lemma dprefixes_infinite: \<open>Infinite x \<in> \<down>\<^sub>d X \<longleftrightarrow> Infinite x \<in> X\<close>
 proof
   show \<open>Infinite x \<in> X \<Longrightarrow> Infinite x \<in> \<down>\<^sub>d X\<close>
@@ -347,7 +415,7 @@ lemma dprefixes_empty: \<open>\<down>\<^sub>d {} = {}\<close>
   unfolding dprefixes_def
   using prefix_closure_empty by blast
 
-lemma dprefixes_Inter_distrib: \<open>\<down>\<^sub>d (\<Inter> S) \<subseteq> \<Inter> (dprefixes ` S)\<close>
+lemma dprefixes_Inter_distrib_l: \<open>\<down>\<^sub>d (\<Inter> S) \<subseteq> \<Inter> (dprefixes ` S)\<close>
   unfolding dprefixes_def prefix_closure_def
   by auto
 
@@ -359,25 +427,181 @@ proof
     by force
 next
   show \<open>\<down>\<^sub>d \<Inter> (dprefixes ` S) \<subseteq> \<Inter> (dprefixes ` S)\<close>
-    using dprefixes_idem  dprefixes_Inter_distrib 
+    using dprefixes_idem  dprefixes_Inter_distrib_l
     by blast
 qed
 
 lemma dprefixes_mono: 
   assumes \<open>X \<subseteq> Y\<close>
   shows \<open>\<down>\<^sub>d X \<subseteq> \<down>\<^sub>d Y\<close>
-  using assms
-  apply (simp add: dprefixes_def)
-  apply (simp add: prefix_closure_def)
-  apply (rule)
-  using prefixes_extensions by blast
-
+  using assms unfolding dprefixes_def prefix_closure_def
+  using prefixes_extensions by fastforce
 
 lemma dprefixes_inter: \<open>\<down>\<^sub>d (\<down>\<^sub>d X \<inter> \<down>\<^sub>d Y) = (\<down>\<^sub>d X \<inter> \<down>\<^sub>d Y)\<close>
   by (rule dprefixes_Inter[where S = \<open>{X,Y}\<close>, simplified])
 
-lemma dprefixes_inter_distrib: \<open>\<down>\<^sub>d (X \<inter> Y) \<subseteq> \<down>\<^sub>d X \<inter> \<down>\<^sub>d Y\<close>
-  using dprefixes_Inter_distrib[where S = \<open>{X,Y}\<close>] by auto
+lemma dprefixes_inter_distrib_l: \<open>\<down>\<^sub>d (X \<inter> Y) \<subseteq> \<down>\<^sub>d X \<inter> \<down>\<^sub>d Y\<close>
+  using dprefixes_Inter_distrib_l[where S = \<open>{X,Y}\<close>] by auto
+
+lemma prefix_closure_Inter_extensions: 
+  assumes \<open>\<forall> X \<in> S. \<up> x \<subseteq> \<down>\<^sub>s X\<close>
+  shows \<open>\<up> x \<subseteq> \<down>\<^sub>s (\<Inter> S)\<close>
+proof
+  fix x' assume E: \<open>x' \<in> \<up> x\<close>
+  let ?y = \<open>x' \<frown> Infinite (\<lambda> _. undefined)\<close>
+  obtain k where F: \<open>?y = Infinite k\<close>
+    by (cases x'; simp)
+  from F[THEN sym] have G: \<open>Infinite k \<in> \<up> x'\<close>
+    unfolding extensions_def by blast
+  have A: \<open>\<forall>X \<in> S. ?y \<in> X\<close> unfolding F using assms G
+    by (meson E extensions.dual_order.trans prefix_closure_infinite subsetD)
+  from A F G show \<open>x' \<in> \<down>\<^sub>s \<Inter> S\<close>
+    unfolding prefix_closure_def 
+    by (auto simp add: prefixes_extensions)
+qed
+
+lemma prefix_closure_inter_extensions: 
+  assumes \<open>\<up> x \<subseteq> \<down>\<^sub>s X\<close> and \<open>\<up> x \<subseteq> \<down>\<^sub>s Y\<close>
+  shows \<open>\<up> x \<subseteq> \<down>\<^sub>s (X \<inter> Y)\<close>
+  using assms prefix_closure_Inter_extensions[where S = \<open>{X, Y}\<close>] by auto
+
+lemma dprefixes_Inter_distrib_r: \<open>\<down>\<^sub>d (\<Inter> S) \<supseteq> \<Inter> (dprefixes ` S)\<close>
+  unfolding dprefixes_def
+  using prefix_closure_Inter_extensions by auto
+
+lemma dprefixes_inter_distrib_r : \<open>\<down>\<^sub>d (X \<inter> Y) \<supseteq> \<down>\<^sub>d X \<inter> \<down>\<^sub>d Y\<close>
+  using dprefixes_Inter_distrib_r [where S = \<open>{X,Y}\<close>] by simp
+
+lemma dprefixes_Inter_distrib: \<open>\<down>\<^sub>d (\<Inter> S) = \<Inter> (dprefixes ` S)\<close>
+  using dprefixes_Inter_distrib_l dprefixes_Inter_distrib_r by auto
+
+lemma dprefixes_inter_distrib : \<open>\<down>\<^sub>d (X \<inter> Y) = \<down>\<^sub>d X \<inter> \<down>\<^sub>d Y\<close>
+  using dprefixes_Inter_distrib [where S = \<open>{X,Y}\<close>] by simp
+
+lemma dprefixes_extensions_closure: \<open>P \<subseteq> \<down>\<^sub>d \<up>\<^sub>s P\<close>
+  unfolding extensions_closure_def dprefixes_def prefix_closure_def
+  by blast
+
+lemma dprefixes_range_infinite[simp]: \<open>\<down>\<^sub>d (range Infinite) = UNIV\<close>
+proof
+  show \<open>UNIV \<subseteq> \<down>\<^sub>d range Infinite\<close>
+  unfolding dprefixes_def  prefix_closure_def
+  by (force intro: prefixes_infinite)
+qed force
+
+lemma dprefixes_em: \<open>x \<in> \<down>\<^sub>d Infinite ` P \<Longrightarrow> x \<in> \<down>\<^sub>d Infinite ` (-P) \<Longrightarrow> False\<close>
+  by (meson ComplD Infinite_helper dprefixes_contains_extensions dprefixes_infinite 
+            in_mono prefixes_extensions prefixes_infinite)
+
+lemma dprefixes_alt: \<open>\<down>\<^sub>d X = {x. \<forall>y. x \<frown> Infinite y \<in> X}\<close>
+proof
+  show \<open>\<down>\<^sub>d X \<subseteq> {x. \<forall>y. x \<frown> Infinite y \<in> X}\<close> unfolding dprefixes_def
+    apply clarsimp
+    by (metis in_mono infinite_append_right prefix_closure_infinite 
+              prefixes_append prefixes_extensions)
+next
+  show \<open>{x. \<forall>y. x \<frown> Infinite y \<in> X} \<subseteq> \<down>\<^sub>d X\<close> unfolding dprefixes_def
+    apply (clarsimp simp: extensions_def)
+    by (metis UN_I infinite_append_right prefix_closure_def prefixes_append trace.assoc)
+qed
+
+lemma dprefixes_alt': \<open>\<down>\<^sub>d X = {x. \<up> x \<inter> range Infinite \<subseteq> X}\<close>
+proof
+  show \<open>\<down>\<^sub>d X \<subseteq> {x. \<up> x \<inter> range Infinite \<subseteq> X}\<close>
+    unfolding dprefixes_alt extensions_def
+    apply clarsimp
+    by (metis Traces.append.simps(3) infinite_append_right trace.assoc)
+next
+  show \<open>{x. \<up> x \<inter> range Infinite \<subseteq> X} \<subseteq> \<down>\<^sub>d X\<close>
+    unfolding dprefixes_alt extensions_def
+    apply clarsimp
+    using infinite_append_right by fastforce
+qed
+
+lemma infinite_trace_differs: 
+  \<open>(x :: 'a infinite_trace) \<noteq> y \<Longrightarrow> \<exists>i. x i \<noteq> y i\<close>
+  by blast
+
+lemma distinct_itraces:
+  assumes \<open>(a :: 'a) \<noteq> b\<close>
+  shows \<open>\<exists>g. (f :: 'a infinite_trace) i \<noteq> g i\<close>
+  apply (rule_tac x = \<open>\<lambda>i. if f i = a then b else a\<close> in exI)
+  using assms by auto
+
+lemma dprefixes_extensions: 
+  assumes \<open>(a :: 'a) \<noteq> b\<close>
+  shows \<open>\<down>\<^sub>d \<up> x = \<up> (x :: 'a trace)\<close>
+proof 
+  show \<open>\<down>\<^sub>d \<up> x \<subseteq> \<up> x\<close>
+  proof (cases x)
+    case (Finite xs)
+    note F = this show ?thesis 
+    proof
+      fix v assume X: \<open>v \<in> \<down>\<^sub>d \<up> x\<close> show \<open>v \<in> \<up> x\<close>
+      proof (cases v)
+        case (Finite ys)
+        show ?thesis
+        proof (cases \<open>length ys \<ge> length xs\<close>)
+          case True
+          from True X F Finite have Y: \<open>xs = take (length xs) ys\<close>
+            unfolding dprefixes_alt
+            apply clarsimp
+            apply (drule_tac x = \<open>\<lambda>_. undefined\<close> in spec)
+            apply (clarsimp simp: prefixes_extensions[THEN sym] ttake_finite_prefixes)
+            apply (rule nth_equalityI, simp)  
+            by (simp, smt (verit, best) add_0 diff_zero nth_map_upt nth_take order_less_le_trans)
+          from True X F Finite show ?thesis unfolding dprefixes_alt
+            apply (clarsimp simp add: extensions_def)
+            apply (rule_tac x = \<open>Finite (drop (length xs) ys)\<close> in exI)
+            apply clarsimp
+            apply (subst Y)
+            by simp
+        next
+          case False
+          obtain f :: \<open>'a infinite_trace\<close> where H: \<open>undefined \<noteq> f 0\<close>
+            using distinct_itraces[OF assms, where f = \<open>\<lambda>_. undefined\<close>] by auto
+          from False F Finite H show ?thesis
+            using X [simplified dprefixes_alt, simplified, THEN spec, where x = \<open>\<lambda>_. undefined\<close>]
+                  X [simplified dprefixes_alt, simplified, THEN spec, where x = \<open>f\<close>]
+            apply (clarsimp simp: prefixes_extensions[THEN sym] ttake_finite_prefixes)
+            apply (drule_tac f = \<open>\<lambda>l. l ! length ys\<close> in arg_cong)
+            apply (drule_tac f = \<open>\<lambda>l. l ! length ys\<close> in arg_cong)
+            by clarsimp
+        qed
+      next
+        case (Infinite f)
+        with X show ?thesis 
+          using dprefixes_infinite by blast
+      qed
+    qed
+  next
+    case (Infinite f)
+    show ?thesis
+    proof 
+      fix v assume X: \<open>v \<in> \<down>\<^sub>d \<up> x\<close> show \<open>v \<in> \<up> x\<close>
+      proof (cases v)
+        case (Finite xs)
+        obtain g where \<open>f (length xs) \<noteq> g (length xs)\<close>
+          using distinct_itraces[OF assms] by auto 
+        with X Finite Infinite show ?thesis unfolding dprefixes_alt 
+          apply clarsimp
+          apply (frule_tac x = \<open>f\<close> in spec)
+          apply (drule_tac x = \<open>g\<close> in spec)
+          by (smt (z3) diff_add_inverse not_add_less1 prefixes_extensions 
+                       prefixes_infinite_greatest trace.inject(2))
+      next
+        case (Infinite _)
+        with X show ?thesis unfolding dprefixes_alt
+          by clarsimp
+      qed
+    qed
+  qed
+next
+  show \<open>\<up> x \<subseteq> \<down>\<^sub>d \<up> x\<close>
+    unfolding dprefixes_alt
+    by (metis dprefixes_alt dprefixes_extensions_closure 
+              extensions_closure_extensions)
+qed
 
 section \<open>Definitive Sets\<close>
 
@@ -409,8 +633,8 @@ lemma definitive_inter: \<open>definitive X \<Longrightarrow> definitive Y \<Lon
 lemma definitive_infinite_extension:
   assumes \<open>definitive X\<close> and \<open>t \<in> X\<close> 
   shows \<open>\<exists> f. Infinite f \<in> X \<and> t \<in> \<down> Infinite f\<close>
-using assms proof (cases t)
-  case (Finite xs) then show ?thesis
+using assms proof (cases \<open>t\<close>)
+  case (Finite xs) then show \<open>?thesis\<close>
     apply (intro exI[where x=\<open>\<lambda>n. if n < length xs then xs!n else undefined\<close>])
     by (force simp:   prefixes_extensions[THEN sym] prefixes_def 
               intro!: definitive_contains_extensions[THEN subsetD, OF assms] 
@@ -423,6 +647,36 @@ lemma definitive_elemI:
   using assms
   by (auto simp add: definitive_def dprefixes_def)
 
+
+lemma definitive_elem_infI:
+  assumes \<open>definitive X\<close> \<open>\<And>x. t \<frown> Infinite x \<in> X\<close> 
+  shows \<open>t \<in> X\<close>
+  using assms by (clarsimp simp: extensions_def prefix_closure_def prefixes_def 
+                           intro!: definitive_elemI,
+                  metis (no_types, lifting) Traces.append.simps(1) thead.cases trace.assoc)
+
+lemma definitive_infinite_non_extension:
+  assumes \<open>definitive X\<close> and \<open>t \<notin> X\<close> 
+  shows \<open>\<exists> f. Infinite f \<notin> X \<and> t \<in> \<down> Infinite f\<close>
+  using assms 
+proof (cases t)
+  case (Finite x1)
+  with assms show ?thesis
+    by (metis (no_types, lifting) Traces.append.simps(1)
+        definitive_elem_infI ttake_finite_prefixes ttake_simp)
+next
+  case (Infinite x2)
+  with assms show ?thesis by blast
+qed
+
+lemma definitive_extensions_closure:
+  assumes \<open>definitive X\<close>
+  shows \<open>\<up>\<^sub>s X = X\<close>
+  using assms unfolding definitive_def
+  by (metis extensions_closure_dprefixes)
+
+lemma non_dprefix: \<open>Finite x \<notin> \<down>\<^sub>d Infinite ` P \<Longrightarrow> \<exists> xy \<in> - P. Finite x \<in> \<down> Infinite xy\<close>
+  by (metis ComplI definitive_dprefixes definitive_infinite_non_extension dprefixes_infinite image_eqI)
 
 definition dUnion :: \<open>'a trace set set \<Rightarrow> 'a trace set\<close> (\<open>\<Union>\<^sub>d\<close>) where
   \<open>\<Union>\<^sub>d X = \<down>\<^sub>d \<Union> X\<close>
@@ -460,7 +714,8 @@ lemma dUnion_least_definitive:
 section \<open>A type for definitive sets\<close>
 
 typedef 'a dset = \<open>{p :: 'a trace set. definitive p }\<close>
-  by (rule_tac x = UNIV in exI, simp, rule definitive_UNIV)
+  using definitive_UNIV by blast
+
 setup_lifting type_definition_dset
 
 lift_definition Inter_dset :: \<open>'a dset set \<Rightarrow> 'a dset\<close> (\<open>\<Sqinter>\<close>) is \<open>\<lambda> ss. \<Inter> ss\<close>
@@ -478,7 +733,7 @@ abbreviation union_dset :: \<open>'a dset \<Rightarrow> 'a dset \<Rightarrow> 'a
 lift_definition empty_dset :: \<open>'a dset\<close> (\<open>\<emptyset>\<close>) is \<open>{}\<close>
   by (rule definitive_empty)
 
-lift_definition univ_dset :: \<open>'a dset\<close> (\<open>\<D>\<close>) is \<open>UNIV\<close> 
+lift_definition univ_dset :: \<open>'a dset\<close> (\<open>\<Sigma>\<infinity>\<close>) is \<open>UNIV\<close> 
   by (rule definitive_UNIV)
 
 lift_definition subset_dset :: \<open>'a dset \<Rightarrow> 'a dset \<Rightarrow> bool\<close> (infix \<open>\<sqsubseteq>\<close> 50) is \<open>(\<subseteq>)\<close> 
@@ -493,8 +748,22 @@ lift_definition in_dset :: \<open>'a trace \<Rightarrow> 'a dset \<Rightarrow> b
 lift_definition notin_dset :: \<open>'a trace \<Rightarrow> 'a dset \<Rightarrow> bool\<close> is \<open>(\<notin>)\<close>
   done
 
-interpretation dset: complete_lattice \<open>\<Sqinter>\<close> \<open>\<Squnion>\<close> \<open>(\<sqinter>)\<close> \<open>(\<sqsubseteq>)\<close> \<open>(\<sqsubset>)\<close> \<open>(\<squnion>)\<close> \<open>\<emptyset>\<close> \<open>\<D>\<close>
-proof (unfold_locales; simp?;transfer)
+lemma in_dset_\<epsilon>: \<open>in_dset \<epsilon> A \<Longrightarrow> A = \<Sigma>\<infinity>\<close>
+  apply (transfer)
+  using definitive_contains_extensions extensions_empty by blast
+
+lemma in_dset_UNIV: \<open>in_dset x \<Sigma>\<infinity>\<close>
+  by (transfer, simp)
+
+lemma in_dset_subset: \<open>A \<sqsubseteq> B \<Longrightarrow> in_dset x A \<Longrightarrow> in_dset x B\<close>
+  by (transfer, auto)
+
+lemma in_dset_inter: \<open>in_dset x A \<Longrightarrow> in_dset x B \<Longrightarrow> in_dset x (A \<sqinter> B)\<close>
+  by (transfer, simp)
+
+
+interpretation dset: complete_lattice \<open>\<Sqinter>\<close> \<open>\<Squnion>\<close> \<open>(\<sqinter>)\<close> \<open>(\<sqsubseteq>)\<close> \<open>(\<sqsubset>)\<close> \<open>(\<squnion>)\<close> \<open>\<emptyset>\<close> \<open>\<Sigma>\<infinity>\<close>
+proof (unfold_locales;transfer)
   fix X Y Z :: \<open>'a trace set\<close> assume \<open>definitive X\<close> \<open>definitive Y\<close> \<open>definitive Z\<close>
   then show \<open> Y \<subseteq> X \<Longrightarrow> Z \<subseteq> X \<Longrightarrow> (Y \<union>\<^sub>d Z) \<subseteq> X\<close>
     by (metis dUnion_def dUnion_least_definitive insert_iff singletonD)
@@ -520,8 +789,28 @@ unfolding set_eq_iff proof
     by blast
 qed
 
+
+lemma infinites_alt_subset: 
+  \<open>infinites Q \<subseteq> infinites P \<longleftrightarrow> Q \<inter> range Infinite \<subseteq> P \<inter> range Infinite\<close>
+  using infinites_alt [THEN sym] by blast
+
+lemma infinites_alt_in :\<open>x \<in> infinites P \<longleftrightarrow> Infinite x \<in> P \<inter> range Infinite\<close>
+  using infinites_alt by auto
+
+lemma infinites_alt_eq :\<open>infinites P = Q \<longleftrightarrow>  P \<inter> range Infinite = Infinite ` Q\<close>
+proof
+  assume \<open>infinites P = Q\<close>
+  then show \<open>P \<inter> range Infinite = Infinite ` Q\<close>
+  using infinites_alt by auto
+next
+  assume \<open>P \<inter> range Infinite = Infinite ` Q\<close>
+  then show \<open>infinites P = Q\<close>
+  using infinites_alt[THEN sym] 
+  by (metis (mono_tags, lifting) image_iff subsetI subset_antisym trace.inject(2))
+qed
+
 lemma infinites_append_right: \<open>t \<frown> Infinite \<omega> \<in> range Infinite\<close>
-  by (cases t; auto)
+  by (cases \<open>t\<close>; auto)
 
 lemma infinites_prefix_closure:
   assumes \<open>definitive X\<close>
@@ -538,10 +827,10 @@ lemma infinites_empty[simp]: \<open>infinites {} = {}\<close>
  
 lemma infinites_Inter: \<open>infinites (\<Inter> S) = \<Inter> (infinites ` S)\<close>
   unfolding infinites_def
-  apply (rule; rule)
-   apply (force)
-   apply (simp split: trace.split trace.split_asm)
-  by (metis InterI trace.distinct(1) trace.exhaust trace.inject(2))
+  apply (rule set_eqI, rule iffI)
+   apply (force split: trace.split trace.split_asm)
+  apply (simp split: trace.split trace.split_asm)
+  by (metis InterI trace.exhaust trace.inject(2) trace.simps(4))
 
 lemma infinites_Union: \<open>infinites (\<Union> S) = \<Union> (infinites ` S)\<close>
   unfolding infinites_def
@@ -601,9 +890,7 @@ lemma property_Inter: \<open>property (\<Sqinter> S) = \<Inter> (property ` S)\<
 lemma property_Union: \<open>property (\<Squnion> S) = \<Union> (property ` S)\<close>
   by (transfer, simp add: dUnion_def infinites_dprefixes infinites_Union)
 
-
-
-interpretation dset: complete_distrib_lattice \<open>\<Sqinter>\<close> \<open>\<Squnion>\<close> \<open>(\<sqinter>)\<close> \<open>(\<sqsubseteq>)\<close> \<open>(\<sqsubset>)\<close> \<open>(\<squnion>)\<close> \<open>\<emptyset>\<close> \<open>\<D>\<close>
+interpretation dset: complete_distrib_lattice \<open>\<Sqinter>\<close> \<open>\<Squnion>\<close> \<open>(\<sqinter>)\<close> \<open>(\<sqsubseteq>)\<close> \<open>(\<sqsubset>)\<close> \<open>(\<squnion>)\<close> \<open>\<emptyset>\<close> \<open>\<Sigma>\<infinity>\<close>
   by (unfold_locales)
      (auto intro: completions_reflecting simp add: property_Inter property_Union INF_SUP_set)
 
@@ -614,7 +901,7 @@ definition iprepend :: \<open>'a infinite_trace set \<Rightarrow> 'a infinite_tr
 lemma iprepend_itdrop: \<open>itdrop k x \<in> iprepend B \<longleftrightarrow> itdrop (Suc k) x \<in> B\<close>
   by (simp add: iprepend_def)
 
-lemmas iprepend_itdrop_0[simp] = iprepend_itdrop[where k = 0,simplified]
+lemmas iprepend_itdrop_0[simp] = iprepend_itdrop[where k = \<open>0\<close>,simplified]
 
 definition prepend' :: \<open>'a trace set \<Rightarrow> 'a trace set\<close> where
   \<open>prepend' X = {t. tdrop 1 t \<in> X }\<close>
@@ -623,19 +910,19 @@ lemma trace_uncons_cases [case_names Cons Nil]:
   assumes \<open>\<And>\<sigma> t. x = singleton \<sigma> \<frown> t \<Longrightarrow> P\<close> 
   and \<open>x = \<epsilon> \<Longrightarrow> P\<close> 
   shows \<open>P\<close>
-proof (cases x)
+proof (cases \<open>x\<close>)
   case (Finite xs)
-  then show ?thesis 
-    by (cases xs; 
+  then show \<open>?thesis\<close> 
+    by (cases \<open>xs\<close>; 
         force simp: assms(2)[simplified \<epsilon>_def] 
-              intro: assms(1)[where t = "Finite ts" for ts,
+              intro: assms(1)[where t = \<open>Finite ts\<close> for ts,
                      simplified singleton_def append.simps List.append.simps])
 next
   case (Infinite f) note A = this
   have \<open>f = (\<lambda>n. if n = 0 then [f 0] ! n else (f \<circ> Suc) (n - length [f 0]))\<close>
     by (rule ext, simp)
-  with A show ?thesis 
-    using assms(1)[where \<sigma> = \<open>f 0\<close> and t = "Infinite (f \<circ> Suc)",
+  with A show \<open>?thesis\<close> 
+    using assms(1)[where \<sigma> = \<open>f 0\<close> and t = \<open>Infinite (f \<circ> Suc)\<close>,
                    simplified singleton_def append.simps, simplified]
     by simp
 qed
@@ -644,9 +931,9 @@ lemma append_prefixes_left: \<open>a \<in> \<down> b \<Longrightarrow> c \<frown
   by (simp add: prefixes_def) (metis trace.assoc)
 
 lemma tdrop_singleton_append[simp]: \<open>tdrop (Suc n) (singleton \<sigma> \<frown> t) = tdrop n t\<close>
-  by (case_tac t, simp_all add: singleton_def itdrop_def)
+  by (cases \<open>t\<close>, simp_all add: singleton_def itdrop_def)
 lemma tdrop_zero[simp]: \<open>tdrop 0 t = t\<close>
-  by (case_tac t; simp)
+  by (cases \<open>t\<close>; simp)
 lemma tdrop_\<epsilon>[simp]: \<open>tdrop k \<epsilon> = \<epsilon>\<close>
   by (simp add: \<epsilon>_def)
 
@@ -655,14 +942,14 @@ proof (rule)
   fix x 
   assume A: \<open> x \<in> \<down>\<^sub>s prepend' X\<close> 
   show \<open>x \<in> prepend' (\<down>\<^sub>s X) \<close>
-  proof (cases x rule: trace_uncons_cases)
+  proof (cases \<open>x\<close> rule: trace_uncons_cases)
     case (Cons \<sigma> t)
-    with A show ?thesis 
+    with A show \<open>?thesis\<close> 
       unfolding prefix_closure_def prepend'_def prefixes_def 
       by (fastforce simp: trace.assoc)
   next
     case Nil
-    with A show ?thesis 
+    with A show \<open>?thesis\<close> 
       unfolding prefix_closure_def prepend'_def
       by (force simp: prefixes_empty_least)
   qed
@@ -675,9 +962,9 @@ proof
   show \<open>\<down>\<^sub>d prepend' X \<subseteq> prepend' X\<close>
   proof (rule)
     fix x assume A: \<open>x \<in> \<down>\<^sub>d prepend' X\<close> show \<open>x \<in> prepend' X\<close>
-    proof (cases x rule: trace_uncons_cases)
+    proof (cases \<open>x\<close> rule: trace_uncons_cases)
       case (Cons \<sigma> t)
-      with A show ?thesis 
+      with A show \<open>?thesis\<close> 
         unfolding dprefixes_def
         apply (subst assms[simplified definitive_def, THEN sym])
         apply (clarsimp dest!: subset_trans[OF _ prepend'_prefix_closure])
@@ -686,7 +973,7 @@ proof
                         prefixes_extensions[THEN sym])
     next
       case Nil
-      with A show ?thesis 
+      with A show \<open>?thesis\<close> 
         apply (subst assms[simplified definitive_def, THEN sym])
         apply (clarsimp simp: prefixes_empty_least prefixes_def dprefixes_def 
                               prepend'_def prefix_closure_def subset_iff
@@ -698,9 +985,9 @@ next
   show \<open>prepend' X \<subseteq> \<down>\<^sub>d prepend' X\<close>
   proof (rule)
     fix x assume A: \<open>x \<in> prepend' X\<close> show \<open>x \<in> \<down>\<^sub>d prepend' X\<close>
-    proof (cases x rule: trace_uncons_cases)
+    proof (cases \<open>x\<close> rule: trace_uncons_cases)
       case (Cons \<sigma> t)
-      with A show ?thesis
+      with A show \<open>?thesis\<close>
         by (clarsimp simp: dprefixes_def prefixes_def prepend'_def 
                               prefix_closure_def prefixes_extensions[THEN sym])
            (metis (mono_tags, lifting) assms definitive_contains_extensions 
@@ -708,7 +995,7 @@ next
                   tdrop_singleton_append tdrop_zero trace.assoc)
     next
       case Nil
-      with A show ?thesis
+      with A show \<open>?thesis\<close>
         using assms definitive_contains_extensions 
         by (force simp: dprefixes_def prepend'_def prefix_closure_def)
     qed
@@ -728,84 +1015,71 @@ lemma prepend_Inter: \<open>\<Sqinter> (prepend ` S) = prepend (\<Sqinter> S)\<c
   apply transfer
   by (auto simp add: prepend'_def)
 
+lemma in_dset_prependD: \<open>in_dset (Finite [a] \<frown> x) (prepend A) \<Longrightarrow> in_dset x A\<close>
+  by (transfer, metis One_nat_def Traces.singleton_def mem_Collect_eq prepend'_def 
+                      tdrop_singleton_append tdrop_zero)
 
-lemma prepend'_mono: \<open>A \<subseteq> B \<Longrightarrow> prepend' A \<subseteq> prepend' B\<close>
-  unfolding prepend'_def
+lemma in_dset_prependI: \<open>in_dset x A \<Longrightarrow> in_dset (Finite [a] \<frown> x) (prepend A)\<close>
+  by (transfer, metis One_nat_def Traces.singleton_def mem_Collect_eq prepend'_def 
+                      tdrop_singleton_append tdrop_zero)
+
+lemma prepend'_mono: 
+  assumes \<open>A \<subseteq> B\<close> 
+  shows   \<open>prepend' A \<subseteq> prepend' B\<close>
+  using assms unfolding prepend'_def
   by blast
 
 lemma property_prepend: \<open>property (prepend X) = iprepend (property X)\<close>
   apply transfer
-  apply (clarsimp simp: definitive_def infinites_def prepend'_def)
-  apply (rule;clarsimp split!: trace.split_asm trace.split)
-   apply (rule_tac x = \<open>Infinite _\<close> in bexI; simp)
-  by blast
+  by (clarsimp simp: definitive_def infinites_def prepend'_def 
+               split!: trace.split_asm trace.split intro!: set_eqI; 
+      blast)
 
 lemma iprepend_Union: \<open>\<Union> (iprepend ` S) = iprepend (\<Union> S)\<close>
   by fastforce
 
+lemma definitives_inverse_eqI: \<open>definitives (property X) = definitives (property Y) \<Longrightarrow> X = Y\<close>
+  by (simp add: definitives_inverse)
+
 lemma prepend_Union: \<open>\<Squnion> (prepend ` S) = prepend (\<Squnion> S)\<close>
-  apply (subst definitives_inverse[THEN sym])
-  apply (rule sym)
-  apply (subst definitives_inverse[THEN sym])
+  apply (rule definitives_inverse_eqI)
   apply (simp add: property_Union property_prepend)
   by (metis UN_extend_simps(10) iprepend_Union)
 
-
 lemma non_empty_trace: \<open> x \<noteq> \<epsilon> \<longleftrightarrow> (\<exists>\<sigma> x'. x = Finite [\<sigma>] \<frown> x')\<close>
-  apply (rule)
-   apply (cases x)
-    apply (case_tac x1)
-     apply (simp add: \<epsilon>_def)
-    apply simp
-    apply (metis Traces.singleton_def trace_uncons_cases)
-   apply (rule_tac x = \<open>x2 0\<close> in exI)
-   apply (rule_tac x = \<open>Infinite (x2 o Suc)\<close> in exI)
-   apply simp
-   apply (rule ext)
-   apply simp
-  apply clarsimp
-  apply (case_tac x')
-   apply (simp add: \<epsilon>_def)
-  apply (simp add: \<epsilon>_def)
-  done
+  apply (cases \<open>x\<close> rule: trace_uncons_cases; clarsimp)
+   apply (metis Traces.singleton_def \<epsilon>_def append_is_empty(1) not_Cons_self2 trace.inject(1))
+  by (metis \<epsilon>_def append_is_empty(1) list.discI trace.inject(1))
 
 lemma thead_append: \<open>x \<noteq> \<epsilon> \<Longrightarrow> thead (x \<frown> y) = thead x\<close>
-  by (cases x; cases y; simp add: \<epsilon>_def nth_append)
+  by (cases \<open>x\<close>; cases \<open>y\<close>; simp add: \<epsilon>_def nth_append)
 
 lemma thead_prefix: \<open> x \<in> \<down> y \<Longrightarrow> x \<noteq> \<epsilon> \<Longrightarrow> thead x = thead y\<close>
-  apply (simp add: prefixes_def)
-  apply (simp add: non_empty_trace)
+  apply (simp add: prefixes_def non_empty_trace)
   using thead_append [where x = \<open>Finite [_]\<close>, simplified \<epsilon>_def, simplified]
   by (metis append_is_empty(1) thead_append)
 
-lemma compr'_inter_thead: \<open>\<down>\<^sub>d {x. x \<noteq> \<epsilon> \<and> P (thead x)} \<inter> \<down>\<^sub>d {x.  x \<noteq> \<epsilon> \<and>  Q (thead x)} = \<down>\<^sub>d {x. x \<noteq> \<epsilon> \<and>  P (thead x) \<and> Q (thead x)}\<close>
-  apply (clarsimp simp add: set_eq_iff subset_iff dprefixes_def prefix_closure_def prefixes_extensions[THEN sym])
-  apply (rule)
-   apply clarsimp
-  apply (case_tac \<open>t = \<epsilon>\<close>)
-    apply (simp add: prefixes_empty_least)
-    apply (simp add: prefixes_empty)
-   apply (drule_tac x = t in spec)
-    apply clarsimp
-    apply (drule_tac x = xa in spec)
-    apply clarsimp
-    apply (drule thead_prefix;simp)
-    apply metis
-
-   apply (drule_tac x = t in spec)
-   apply clarsimp
-    apply (drule_tac x = t in spec)
-    apply clarsimp
-   apply (drule thead_prefix,simp)
-
-   apply (drule thead_prefix,simp)
-   apply fastforce
-  apply (rule)
-   apply clarsimp
-   apply blast
-  apply blast
-  done
-
+lemma compr'_inter_thead: 
+    \<open>\<down>\<^sub>d {x. x \<noteq> \<epsilon> \<and> P (thead x)} \<inter> \<down>\<^sub>d {x.  x \<noteq> \<epsilon> \<and> Q (thead x)} 
+   = \<down>\<^sub>d {x. x \<noteq> \<epsilon> \<and> P (thead x) \<and> Q (thead x)}\<close>
+proof (rule)
+{ fix x t
+  assume \<open>\<forall>t. x \<in> \<down> t \<longrightarrow> (\<exists>x. x \<noteq> \<epsilon> \<and> P (thead x) \<and> t \<in> \<down> x)\<close>
+  and    \<open>\<forall>t. x \<in> \<down> t \<longrightarrow> (\<exists>x. x \<noteq> \<epsilon> \<and> Q (thead x) \<and> t \<in> \<down> x)\<close>
+  and    \<open>x \<in> \<down> t\<close>
+  then have \<open> \<exists>x. x \<noteq> \<epsilon> \<and> P (thead x) \<and> Q (thead x) \<and> t \<in> \<down> x\<close>
+    by (cases \<open>t = \<epsilon>\<close>; fastforce dest: thead_prefix simp: prefixes_empty prefixes_empty_least)
+} then show \<open>\<down>\<^sub>d {x. x \<noteq> \<epsilon> \<and> P (thead x)} \<inter> \<down>\<^sub>d {x.  x \<noteq> \<epsilon> \<and> Q (thead x)} \<subseteq> \<down>\<^sub>d {x. x \<noteq> \<epsilon> \<and> P (thead x) \<and> Q (thead x)}\<close> 
+  by (clarsimp simp: set_eq_iff subset_iff dprefixes_def prefix_closure_def prefixes_extensions[THEN sym])
+next
+{ fix x
+  assume \<open> \<forall>t. x \<in> \<down> t \<longrightarrow> (\<exists>x. x \<noteq> \<epsilon> \<and> P (thead x) \<and> Q (thead x) \<and> t \<in> \<down> x)\<close>
+  then have \<open>(\<forall>t. x \<in> \<down> t \<longrightarrow> (\<exists>x. x \<noteq> \<epsilon> \<and> P (thead x) \<and> t \<in> \<down> x)) \<and>
+             (\<forall>t. x \<in> \<down> t \<longrightarrow> (\<exists>x. x \<noteq> \<epsilon> \<and> Q (thead x) \<and> t \<in> \<down> x))\<close>
+    by fastforce }
+  then show \<open>\<down>\<^sub>d {x. x \<noteq> \<epsilon> \<and> P (thead x)} \<inter> \<down>\<^sub>d {x.  x \<noteq> \<epsilon> \<and> Q (thead x)} \<supseteq> \<down>\<^sub>d {x. x \<noteq> \<epsilon> \<and> P (thead x) \<and> Q (thead x)}\<close> 
+  by (clarsimp simp: set_eq_iff subset_iff dprefixes_def prefix_closure_def prefixes_extensions[THEN sym])
+qed
 
 lift_definition compr :: \<open>('a trace \<Rightarrow> bool) \<Rightarrow> 'a dset\<close> is \<open>\<lambda>p. \<down>\<^sub>d {x. p x }\<close>
   by (rule definitive_dprefixes)
@@ -813,6 +1087,11 @@ lift_definition compr :: \<open>('a trace \<Rightarrow> bool) \<Rightarrow> 'a d
 
 lift_definition complement :: \<open>'a dset \<Rightarrow> 'a dset\<close> is \<open>\<lambda>p. \<down>\<^sub>d (range Infinite - p)\<close>
   by (rule definitive_dprefixes)
+
+
+lemma property_complement[simp]: \<open>property (complement X) = UNIV - property X\<close>
+  by (transfer, force simp: infinites_dprefixes[simplified infinites_def] infinites_def 
+                      split: trace.split_asm trace.split)
 
 
 end
